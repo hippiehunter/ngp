@@ -663,6 +663,20 @@ search_t * subsearch(search_t *father)
 	return child;
 }
 
+void display_status(void)
+{
+	char *rollingwheel[4] = {"/", "-", "\\", "|"};
+	static int i = 0;
+
+	char nbhits[15];
+	if (mainsearch.status)
+		mvaddstr(0, COLS - 1, rollingwheel[++i%4]);
+	else
+		mvaddstr(0, COLS - 5, "Done.");
+	snprintf(nbhits, 15, "Hits: %d", current->nbentry);
+	mvaddstr(1, COLS - (int)(strchr(nbhits, '\0') - nbhits), nbhits);
+}
+
 int main(int argc, char *argv[])
 {
 	DIR *dp;
@@ -823,6 +837,9 @@ int main(int argc, char *argv[])
 
 		usleep(10000);
 		refresh();
+		synchronized(mainsearch.data_mutex) {
+			display_status();
+		}
 
 		synchronized(mainsearch.data_mutex) {
 			if (mainsearch.status == 0 && mainsearch.nbentry == 0) {
