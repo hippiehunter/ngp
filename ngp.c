@@ -45,31 +45,38 @@ mutex && !pthread_mutex_lock(mutex); \
 pthread_mutex_unlock(mutex), mutex = 0)
 
 typedef struct s_entry_t {
-	char file[PATH_MAX];
-	char line[NAME_MAX];
+	char *data;
+	char isfile:1;
 } entry_t;
 
-typedef struct s_data_t {
+typedef struct s_search_t {
+	/* screen */
 	int index;
 	int cursor;
+
+	/* data */
+	entry_t *entries;
 	int nbentry;
 	int size;
-	int raw;
-	entry_t *entry;
+
+	/* thread */
+	pthread_mutex_t data_mutex;
+	int status;
+
+	/* search */
 	char directory[PATH_MAX];
 	char pattern[NAME_MAX];
 	char options[NAME_MAX];
 	char file_type[4];
-	pthread_mutex_t data_mutex;
-	int status;
 	char specific_files_list[256][NAME_MAX];
 	int specific_files_number;
 	char extensions_list[64][NAME_MAX];
 	int extensions_number;
-} data_t;
+	int raw;	
+} search_t;
 
-static data_t data;
-static pid_t pid;
+static search_t	search;
+static pid_t	pid;
 
 static void ncurses_add_file(const char *file);
 static void ncurses_add_line(const char *line, const char* file);
