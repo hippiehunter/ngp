@@ -619,7 +619,7 @@ search_t * subsearch(search_t *father)
 	mvwprintw(searchw, 1, 1, "To search:");
 	while ((car = wgetch(searchw)) != '\n' && j<256) {
 		if (car == 8 || car == 127) {
-			if (j>0)
+			if (j > 0)
 				search[--j] = 0;
 			mvwprintw(searchw, 1, 1, "To search: %s ", search);
 			continue;
@@ -643,16 +643,20 @@ search_t * subsearch(search_t *father)
 	child->entries = calloc(100, sizeof(entry_t));
 	strncpy(child->pattern, search, 256);
 
-	for (i=0; i<father->nbentry; i++) {
+	for (i=0; i < father->nbentry; i++) {
 		if (strstr(father->entries[i].data, search) != NULL || is_file(i)) {
 			char *new_data;
 
+			if (child->nbentry > 1 && child->entries[child->nbentry - 1].isfile
+				&& is_file(i)) {
+				free(child->entries[child->nbentry - 1].data);
+				child->nbentry--;
+			}
 			check_alloc(child, 100);
 			new_data = malloc(LINE_MAX * sizeof(char));
 			strncpy(new_data, father->entries[i].data, LINE_MAX);
 			child->entries[child->nbentry].data = new_data;
-			child->entries[child->nbentry].isfile =
-				father->entries[i].isfile;
+			child->entries[child->nbentry].isfile =	father->entries[i].isfile;
 			child->nbentry++;
 		}
 	}
