@@ -674,6 +674,7 @@ void display_status(void)
 	static int i = 0;
 
 	char nbhits[15];
+	attron(COLOR_PAIR(1));
 	if (mainsearch.status)
 		mvaddstr(0, COLS - 1, rollingwheel[++i%4]);
 	else
