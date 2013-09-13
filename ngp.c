@@ -828,11 +828,13 @@ int main(int argc, char *argv[])
 			resize(&current->index, &current->cursor);
 			break;
 		case QUIT:
-			if (current->father == NULL)
+			if (current->father == NULL) {
 				goto quit;
-			else {
+			} else {
+				tmp = current->father;
 				clean_search(current);
-				current = current->father;
+				current = tmp;
+				current->child = NULL;
 				clear();
 				display_entries(&current->index, &current->cursor);
 			}
