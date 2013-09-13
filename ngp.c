@@ -610,7 +610,7 @@ search_t * subsearch(search_t *father)
 	WINDOW		*searchw;
 	search_t	*child;
 	int		i, j=0, car;
-	char		search[256] = {0};
+	char		search[LINE_MAX] = {0};
 
 	searchw = newwin(3, 50, (LINES-3)/2 , (COLS-50)/2);
 	box(searchw, 0,0);
@@ -618,8 +618,8 @@ search_t * subsearch(search_t *father)
 	refresh();
 
 	mvwprintw(searchw, 1, 1, "To search:");
-	while ((car = wgetch(searchw)) != '\n' && j<256) {
-		if (car == 8 || car == 127) {
+	while ((car = wgetch(searchw)) != '\n' && j < LINE_MAX) {
+		if (car == 8 || car == 127) { //backspace
 			if (j > 0)
 				search[--j] = 0;
 			mvwprintw(searchw, 1, 1, "To search: %s ", search);
@@ -642,7 +642,7 @@ search_t * subsearch(search_t *father)
 	child->father = father;
 	father->child = child;
 	child->entries = calloc(100, sizeof(entry_t));
-	strncpy(child->pattern, search, 256);
+	strncpy(child->pattern, search, LINE_MAX);
 
 	for (i=0; i < father->nbentry; i++) {
 		if (strstr(father->entries[i].data, search) != NULL || is_file(i)) {
