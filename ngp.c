@@ -598,19 +598,10 @@ void init_searchstruct(search_t *searchstruct)
 	searchstruct->child = NULL;
 }
 
-/*
- * subsearch:
- * 	- create new window to prompt search string
- *	- copy father into child matching string
- *	- realloc child and return it
- */
-//FIXME: subdivide this function
-search_t * subsearch(search_t *father)
+void subsearch_window(char *search)
 {
-	WINDOW		*searchw;
-	search_t	*child;
-	int		i, j=0, car;
-	char		search[LINE_MAX] = {0};
+	WINDOW	*searchw;
+	int	j = 0, car;
 
 	searchw = newwin(3, 50, (LINES-3)/2 , (COLS-50)/2);
 	box(searchw, 0,0);
@@ -630,6 +621,17 @@ search_t * subsearch(search_t *father)
 	}
 	search[j] = 0;
 	delwin(searchw);
+}
+
+search_t * subsearch(search_t *father)
+{
+	search_t	*child;
+	int		i;
+	char		*search;
+
+	search = malloc(LINE_MAX * sizeof(char));
+	memset(search, '\0', LINE_MAX);
+	subsearch_window(search);
 
 	/*Verify search is not empty*/
 	if (search[0] == 0)
@@ -643,9 +645,10 @@ search_t * subsearch(search_t *father)
 	father->child = child;
 	child->entries = calloc(100, sizeof(entry_t));
 	strncpy(child->pattern, search, LINE_MAX);
+	free(search);
 
 	for (i=0; i < father->nbentry; i++) {
-		if (strstr(father->entries[i].data, search) != NULL || is_file(i)) {
+		if (strstr(father->entries[i].data, child->pattern) != NULL || is_file(i)) {
 			char *new_data;
 
 			if (child->nbentry > 1 && child->entries[child->nbentry - 1].isfile
