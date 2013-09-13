@@ -529,9 +529,10 @@ void clean_search(search_t *search)
 	int i;
 
 	for (i=0; i<search->nbentry; i++) {
-		free(search->entries[search->nbentry].data);
+		free(search->entries[i].data);
 	}
 	free(search->entries);
+	free(search);
 }
 
 void clean_all(void)
