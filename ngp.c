@@ -532,7 +532,7 @@ void clean_search(search_t *search)
 		free(search->entries[i].data);
 	}
 	free(search->entries);
-	free(search);
+//	free(search); //wont work cuz mainsearch ain't no pointer yo
 }
 
 void clean_all(void)
