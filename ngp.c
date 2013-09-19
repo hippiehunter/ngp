@@ -33,6 +33,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include <sys/stat.h>
 #include <pthread.h>
 #include <ctype.h>
+#include <regex.h>
 
 #define CURSOR_UP 	'k'
 #define CURSOR_DOWN 	'j'
@@ -81,6 +82,8 @@ typedef struct s_search_t {
 	char extensions_list[64][LINE_MAX];
 	int extensions_number;
 	int raw;
+	int is_regex;
+	regex_t *regex;
 
 	/* search in search */
 	struct s_search_t *father;
@@ -150,6 +153,7 @@ static void usage()
 	fprintf(stderr, " -i : ignore case distinctions in pattern\n");
 	fprintf(stderr, " -r : raw mode\n");
 	fprintf(stderr, " -t type : look for a file extension only\n");
+	fprintf(stderr, " -g : pattern is a regexp\n");
 	exit(-1);
 }
 
@@ -238,6 +242,33 @@ static int display_entry(int *y, int *index, int color)
 	}
 }
 
+static int is_regex_valid(void)
+{
+	regex_t	*reg;
+	int	ret;
+
+	reg = malloc(sizeof(regex_t));
+	if (regcomp(reg, mainsearch.pattern, 0)) {
+		free(reg);
+		return 0;
+	} else {
+		mainsearch.regex = reg;
+		return 1;
+	}
+}
+
+char * regex(char *line, char *pattern)
+{
+	int	ret;
+
+	ret = regexec(mainsearch.regex, line, 0, NULL, 0);
+
+	if (ret != REG_NOMATCH)
+		return "1";
+	else
+		return NULL;
+}
+
 static int parse_file(const char *file, const char *pattern, char *options)
 {
 	FILE *f;
@@ -256,6 +287,9 @@ static int parse_file(const char *file, const char *pattern, char *options)
 		parser = strstr;
 	else
 		parser = strcasestr;
+
+	if (current->is_regex)
+		parser = regex;
 
 	first = 1;
 	line_number = 1;
@@ -603,6 +637,7 @@ void init_searchstruct(search_t *searchstruct)
 	searchstruct->nb_lines = 0;
 	searchstruct->status = 1;
 	searchstruct->raw = 0;
+	searchstruct->is_regex = 0;
 	strcpy(searchstruct->directory, "./");
 	searchstruct->father = NULL;
 	searchstruct->child = NULL;
@@ -716,7 +751,7 @@ int main(int argc, char *argv[])
 	init_searchstruct(&mainsearch);
 	pthread_mutex_init(&mainsearch.data_mutex, NULL);
 
-	while ((opt = getopt(argc, argv, "hit:r")) != -1) {
+	while ((opt = getopt(argc, argv, "hit:rg")) != -1) {
 		switch (opt) {
 		case 'h':
 			usage();
@@ -729,6 +764,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			mainsearch.raw = 1;
+			break;
+		case 'g':
+			mainsearch.is_regex = 1;
 			break;
 		default:
 			exit(-1);
@@ -747,6 +785,11 @@ int main(int argc, char *argv[])
 		} else {
 			strcpy(mainsearch.directory, argv[optind]);
 		}
+	}
+
+	if (mainsearch.is_regex && !is_regex_valid()) {
+		fprintf(stderr, "Bad regexp\n");
+		goto quit;
 	}
 
 	configuration_init(&cfg);
