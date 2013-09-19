@@ -91,8 +91,8 @@ static search_t	mainsearch;
 static search_t	*current;
 static pthread_t pid;
 
-static void ncurses_add_file(const char *file);
-static void ncurses_add_line(const char *line, const char* file);
+static void mainsearch_add_file(const char *file);
+static void mainsearch_add_line(const char *line, const char* file);
 
 static int is_file(int index)
 {
@@ -262,13 +262,13 @@ static int parse_file(const char *file, const char *pattern, char *options)
 	while (fgets(line, sizeof(line), f)) {
 		if (parser(line, pattern) != NULL) {
 			if (first) {
-				ncurses_add_file(file);
+				mainsearch_add_file(file);
 				first = 0;
 			}
 			if (line[strlen(line) - 2] == '\r')
 				line[strlen(line) - 2] = '\0';
 			snprintf(full_line, LINE_MAX, "%d:%s", line_number, line);
-			ncurses_add_line(full_line, file);
+			mainsearch_add_line(full_line, file);
 		}
 		line_number++;
 	}
@@ -379,7 +379,7 @@ static void display_entries(int *index, int *cursor)
 	}
 }
 
-static void ncurses_add_file(const char *file)
+static void mainsearch_add_file(const char *file)
 {
 	char	*new_file;
 
@@ -391,7 +391,7 @@ static void ncurses_add_file(const char *file)
 	mainsearch.nbentry++;
 }
 
-static void ncurses_add_line(const char *line, const char* file)
+static void mainsearch_add_line(const char *line, const char* file)
 {
 	char	*new_line;
 
