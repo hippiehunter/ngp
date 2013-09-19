@@ -64,6 +64,7 @@ typedef struct s_search_t {
 	/* data */
 	entry_t *entries;
 	int nbentry;
+	int nb_lines;
 	int size;
 
 	/* thread */
@@ -400,6 +401,7 @@ static void ncurses_add_line(const char *line, const char* file)
 	mainsearch.entries[mainsearch.nbentry].data = new_line;
 	mainsearch.entries[mainsearch.nbentry].isfile = 0;
 	mainsearch.nbentry++;
+	mainsearch.nb_lines++;
 	if (mainsearch.nbentry < LINES && current == &mainsearch)
 		display_entries(&mainsearch.index, &mainsearch.cursor);
 }
@@ -594,6 +596,7 @@ void init_searchstruct(search_t *searchstruct)
 	searchstruct->cursor = 0;
 	searchstruct->size = 100;
 	searchstruct->nbentry = 0;
+	searchstruct->nb_lines = 0;
 	searchstruct->status = 1;
 	searchstruct->raw = 0;
 	strcpy(searchstruct->directory, "./");
@@ -685,7 +688,7 @@ void display_status(void)
 		mvaddstr(0, COLS - 1, rollingwheel[++i%4]);
 	else
 		mvaddstr(0, COLS - 5, "Done.");
-	snprintf(nbhits, 15, "Hits: %d", current->nbentry);
+	snprintf(nbhits, 15, "Hits: %d", current->nb_lines);
 	mvaddstr(1, COLS - (int)(strchr(nbhits, '\0') - nbhits), nbhits);
 }
 
