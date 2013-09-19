@@ -106,7 +106,8 @@ static int is_dir_good(char *dir)
 {
 	return  strcmp(dir, ".") != 0 &&
 		strcmp(dir, "..") != 0 &&
-		strcmp(dir, ".git") != 0 ? 1 : 0;
+		strcmp(dir, ".git") != 0 &&
+		strcmp(dir, ".svn") != 0 ? 1 : 0;
 }
 
 static int is_specific_file(const char *name)
