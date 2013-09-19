@@ -662,6 +662,12 @@ void subsearch_window(char *search)
 			mvwprintw(searchw, 1, 1, "To search: %s ", search);
 			continue;
 		}
+
+		if (car == 27) { //escape
+			memset(search, 0, LINE_MAX);
+			break;
+		}
+
 		search[j++] = car;
 		mvwprintw(searchw, 1, 1, "To search: %s", search);
 	}
@@ -871,11 +877,10 @@ int main(int argc, char *argv[])
 			break;
 		case '/':
 			tmp = subsearch(current);
-			if (tmp != NULL) {
-				clear();
+			clear();
+			if (tmp != NULL)
 				current = tmp;
-				display_entries(&current->index, &current->cursor);
-			}
+			display_entries(&current->index, &current->cursor);
 			break;
 		case ENTER:
 		case '\n':
