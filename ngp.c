@@ -267,7 +267,7 @@ static int is_regex_valid(search_t *cursearch)
 	}
 }
 
-char * regex(char *line, char *pattern)
+char * regex(const char *line, const char *pattern)
 {
 	int	ret;
 
