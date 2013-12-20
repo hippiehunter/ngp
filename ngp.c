@@ -125,7 +125,7 @@ static int is_specific_file(const char *name)
 	char *name_begins;
 
 	for (i = 0; i < current->specific_files_number; i++) {
-		name_begins = (strrchr(name, '/') != NULL) ? strrchr(name, '/') + 1 : name;
+		name_begins = (strrchr(name, '/') != NULL) ? strrchr(name, '/') + 1 : (char *) name;
 		if (!strcmp(name_begins, current->specific_files_list[i])) {
 			return 1;
 		}
