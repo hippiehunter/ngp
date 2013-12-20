@@ -57,6 +57,11 @@ typedef struct s_entry_t {
 	char isfile:1;
 } entry_t;
 
+typedef struct exclude_list {
+	char			path[256];
+	struct exclude_list	*next;
+} exclude_list_t;
+
 typedef struct s_search_t {
 	/* screen */
 	int index;
@@ -84,16 +89,18 @@ typedef struct s_search_t {
 	int raw;
 	int is_regex;
 	regex_t *regex;
-	int follow_symlinks;
+	int follow_symlinks:1;
+	int has_excludes:1;
 
 	/* search in search */
 	struct s_search_t *father;
 	struct s_search_t *child;
 } search_t;
 
-static search_t	mainsearch;
-static search_t	*current;
-static pthread_t pid;
+static search_t		mainsearch;
+static search_t		*current;
+static pthread_t	pid;
+struct exclude_list	*firstex = NULL;
 
 static void mainsearch_add_file(const char *file);
 static void mainsearch_add_line(const char *line, const char* file);
@@ -113,6 +120,18 @@ static int isfile(char *nodename)
 
 static int is_dir_good(char *dir)
 {
+	exclude_list_t *curex;
+
+	if (mainsearch.has_excludes) {
+		curex = firstex;
+		while (curex) {
+			if (!strncmp(curex->path, dir, 256)) {
+				return 0;
+			}
+			curex = curex->next;
+		}
+	}
+
 	return  strcmp(dir, ".") != 0 &&
 		strcmp(dir, "..") != 0 &&
 		strcmp(dir, ".git") != 0 &&
@@ -773,12 +792,13 @@ int main(int argc, char *argv[])
 	config_t cfg;
 	pthread_mutex_t *mutex;
 	search_t *tmp;
+	struct exclude_list *curex, *tmpex;
 
 	current = &mainsearch;
 	init_searchstruct(&mainsearch);
 	pthread_mutex_init(&mainsearch.data_mutex, NULL);
 
-	while ((opt = getopt(argc, argv, "hit:ref")) != -1) {
+	while ((opt = getopt(argc, argv, "hit:refx:")) != -1) {
 		switch (opt) {
 		case 'h':
 			usage();
@@ -797,6 +817,19 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			mainsearch.follow_symlinks = 1;
+			break;
+		case 'x':
+			if (!firstex) {
+				firstex = malloc(sizeof(struct exclude_list));
+				strncpy(firstex->path, optarg, 256);
+				curex = firstex;
+				mainsearch.has_excludes = 1;
+			} else {
+				tmpex = malloc(sizeof(struct exclude_list));
+				strncpy(tmpex->path, optarg, 256);
+				curex->next = tmpex;
+				curex = tmpex;
+			}
 			break;
 		default:
 			exit(-1);
