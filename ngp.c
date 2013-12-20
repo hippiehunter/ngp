@@ -154,7 +154,7 @@ static void usage()
 	fprintf(stderr, " -i : ignore case distinctions in pattern\n");
 	fprintf(stderr, " -r : raw mode\n");
 	fprintf(stderr, " -t type : look for a file extension only\n");
-	fprintf(stderr, " -g : pattern is a regexp\n");
+	fprintf(stderr, " -e : pattern is a regexp\n");
 	exit(-1);
 }
 
@@ -758,7 +758,7 @@ int main(int argc, char *argv[])
 	init_searchstruct(&mainsearch);
 	pthread_mutex_init(&mainsearch.data_mutex, NULL);
 
-	while ((opt = getopt(argc, argv, "hit:rg")) != -1) {
+	while ((opt = getopt(argc, argv, "hit:re")) != -1) {
 		switch (opt) {
 		case 'h':
 			usage();
@@ -772,7 +772,7 @@ int main(int argc, char *argv[])
 		case 'r':
 			mainsearch.raw = 1;
 			break;
-		case 'g':
+		case 'e':
 			mainsearch.is_regex = 1;
 			break;
 		default:
