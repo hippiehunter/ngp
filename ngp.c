@@ -252,13 +252,13 @@ static int display_entry(int *y, int *index, int color)
 	}
 }
 
-static int is_regex_valid(void)
+static int is_regex_valid(search_t *cursearch)
 {
 	regex_t	*reg;
 	int	ret;
 
 	reg = malloc(sizeof(regex_t));
-	if (regcomp(reg, mainsearch.pattern, 0)) {
+	if (regcomp(reg, cursearch->pattern, 0)) {
 		free(reg);
 		return 0;
 	} else {
@@ -290,16 +290,19 @@ static int parse_file(const char *file, const char *pattern, char *options)
 	errno = 0;
 
 	f = fopen(file, "r");
-	if (f == NULL)
+	if (f == NULL) {
 		return -1;
+	}
 
-	if (strstr(options, "-i") == NULL)
+	if (strstr(options, "-i") == NULL) {
 		parser = strstr;
-	else
+	} else {
 		parser = strcasestr;
+	}
 
-	if (current->is_regex)
+	if (current->is_regex) {
 		parser = regex;
+	}
 
 	first = 1;
 	line_number = 1;
@@ -714,8 +717,10 @@ search_t * subsearch(search_t *father)
 	strncpy(child->pattern, search, LINE_MAX);
 	free(search);
 
+	is_regex_valid(child);
+
 	for (i=0; i < father->nbentry; i++) {
-		if (strstr(father->entries[i].data, child->pattern) != NULL || is_file(i)) {
+		if (regex(father->entries[i].data, child->pattern) || is_file(i)) {
 			char *new_data;
 
 			if (child->nbentry > 1 && child->entries[child->nbentry - 1].isfile
@@ -812,7 +817,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (mainsearch.is_regex && !is_regex_valid()) {
+	if (mainsearch.is_regex && !is_regex_valid(&mainsearch)) {
 		fprintf(stderr, "Bad regexp\n");
 		goto quit;
 	}
