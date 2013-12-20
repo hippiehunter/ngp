@@ -103,6 +103,14 @@ static int is_file(int index)
 	return current->entries[index].isfile;
 }
 
+static int isfile(char *nodename)
+{
+	struct stat buf;
+
+	stat(nodename, &buf);
+	return !S_ISDIR(buf.st_mode);
+}
+
 static int is_dir_good(char *dir)
 {
 	return  strcmp(dir, ".") != 0 &&
@@ -626,7 +634,12 @@ void * lookup_thread(void *arg)
 {
 	search_t *d = (search_t *) arg;
 
-	lookup_directory(d->directory, d->pattern, d->options, d->file_type);
+	if (isfile(d->directory)) {
+		lookup_file(d->directory, d->pattern, d->options);
+	} else {
+		lookup_directory(d->directory, d->pattern, d->options, d->file_type);
+	}
+
 	d->status = 0;
 }
 
