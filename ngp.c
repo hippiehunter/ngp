@@ -84,6 +84,7 @@ typedef struct s_search_t {
 	int raw;
 	int is_regex;
 	regex_t *regex;
+	int follow_symlinks;
 
 	/* search in search */
 	struct s_search_t *father;
@@ -379,7 +380,7 @@ static void lookup_directory(const char *dir, const char *pattern,
 			snprintf(file_path, PATH_MAX, "%s/%s", dir,
 				ep->d_name);
 
-			if (!is_simlink(file_path)) {
+			if (!is_simlink(file_path) || mainsearch.follow_symlinks) {
 				if (file_type != NULL) {
 					if (!strcmp(file_type, ep->d_name + strlen(ep->d_name) - strlen(file_type) ))
 						lookup_file(file_path, pattern, options);
@@ -642,6 +643,7 @@ void init_searchstruct(search_t *searchstruct)
 	strcpy(searchstruct->directory, "./");
 	searchstruct->father = NULL;
 	searchstruct->child = NULL;
+	searchstruct->follow_symlinks = 0;
 }
 
 void subsearch_window(char *search)
@@ -758,7 +760,7 @@ int main(int argc, char *argv[])
 	init_searchstruct(&mainsearch);
 	pthread_mutex_init(&mainsearch.data_mutex, NULL);
 
-	while ((opt = getopt(argc, argv, "hit:re")) != -1) {
+	while ((opt = getopt(argc, argv, "hit:ref")) != -1) {
 		switch (opt) {
 		case 'h':
 			usage();
@@ -774,6 +776,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'e':
 			mainsearch.is_regex = 1;
+			break;
+		case 'f':
+			mainsearch.follow_symlinks = 1;
 			break;
 		default:
 			exit(-1);
