@@ -752,6 +752,9 @@ search_t * subsearch(search_t *father)
 			strncpy(new_data, father->entries[i].data, LINE_MAX);
 			child->entries[child->nbentry].data = new_data;
 			child->entries[child->nbentry].isfile =	father->entries[i].isfile;
+			if (!child->entries[child->nbentry].isfile) {
+				child->nb_lines++;
+			}
 			child->nbentry++;
 		}
 	}
