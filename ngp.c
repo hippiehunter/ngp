@@ -736,7 +736,9 @@ search_t * subsearch(search_t *father)
 	strncpy(child->pattern, search, LINE_MAX);
 	free(search);
 
-	is_regex_valid(child);
+	if (!is_regex_valid(child)) {
+		return NULL;
+	}
 
 	for (i=0; i < father->nbentry; i++) {
 		if (regex(father->entries[i].data, child->pattern) || is_file(i)) {
