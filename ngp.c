@@ -715,8 +715,11 @@ void subsearch_window(char *search)
 search_t * subsearch(search_t *father)
 {
 	search_t	*child;
-	int		i;
+	entry_t		*tmp_file;
+	unsigned int	i;
 	char		*search;
+	bool		orphan_file = 0;
+	char		*new_data;
 
 	search = malloc(LINE_MAX * sizeof(char));
 	memset(search, '\0', LINE_MAX);
@@ -726,9 +729,10 @@ search_t * subsearch(search_t *father)
 	if (search[0] == 0)
 		return NULL;
 
-	if ((child = malloc(sizeof(search_t))) == NULL) {
+	/* create and init subsearch */
+	if ((child = malloc(sizeof(search_t))) == NULL)
 		exit(1);
-	}
+
 	init_searchstruct(child);
 	child->father = father;
 	father->child = child;
@@ -736,27 +740,40 @@ search_t * subsearch(search_t *father)
 	strncpy(child->pattern, search, LINE_MAX);
 	free(search);
 
-	if (!is_regex_valid(child)) {
+	if (!is_regex_valid(child))
 		return NULL;
-	}
 
 	for (i=0; i < father->nbentry; i++) {
-		if (regex(father->entries[i].data, child->pattern) || is_file(i)) {
-			char *new_data;
-
-			if (child->nbentry > 1 && child->entries[child->nbentry - 1].isfile
-				&& is_file(i)) {
-				free(child->entries[child->nbentry - 1].data);
-				child->nbentry--;
+		if (is_file(i)) {
+			/* previous file had no entries, free it */
+			if (orphan_file) {
+				free(tmp_file->data);
+				free(tmp_file);
 			}
+
+			/* create a tmp_file entry but don't add it yet */
+			tmp_file = malloc(sizeof(entry_t));
+			new_data = malloc(LINE_MAX * sizeof(char));
+			strncpy(new_data, strchr(father->entries[i].data, '/') + 2, LINE_MAX);
+			tmp_file->data = new_data;
+			tmp_file->isfile = 1;
+			orphan_file = 1;
+		} else if (regex(father->entries[i].data, child->pattern)) {
 			check_alloc(child, 100);
+			/* file has entries, add it */
+			if (orphan_file) {
+				child->entries[child->nbentry].data = tmp_file->data;
+				child->entries[child->nbentry].isfile = 0;
+				child->nbentry++;
+				orphan_file = 0;
+				free(tmp_file);
+			}
+			/* now add line */
 			new_data = malloc(LINE_MAX * sizeof(char));
 			strncpy(new_data, father->entries[i].data, LINE_MAX);
 			child->entries[child->nbentry].data = new_data;
-			child->entries[child->nbentry].isfile =	father->entries[i].isfile;
-			if (!child->entries[child->nbentry].isfile) {
-				child->nb_lines++;
-			}
+			child->entries[child->nbentry].isfile = 0;
+			child->nb_lines++;
 			child->nbentry++;
 		}
 	}
