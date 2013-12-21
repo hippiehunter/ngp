@@ -612,8 +612,18 @@ void clean_search(search_t *search)
 
 void clean_all(void)
 {
-	search_t *next;
+	search_t	*next;
+	exclude_list_t	*curex, *tmpex;
 
+	/* free linked list of excludes */
+	curex = firstex;
+	while (curex) {
+		tmpex = curex;
+		curex = curex->next;
+		free(tmpex);
+	}
+
+	/* free all search structs */
 	do {
 		next = current->father;
 		clean_search(current);
