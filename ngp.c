@@ -869,7 +869,7 @@ int main(int argc, char *argv[])
 		if (!mainsearch_attr.firstext) {
 			mainsearch_attr.firstext = tmpext;
 		} else {
-			tmpext->next = curext;
+			curext->next = tmpext;
 		}
 		
 		strncpy(tmpext->ext, ptr, 256);
@@ -889,7 +889,7 @@ int main(int argc, char *argv[])
 			//FIXME: maybe the LL is empty hehe ...
 			tmpext = malloc(sizeof(extension_list_t));
 			strncpy(tmpext->ext, optarg, 256);
-			tmpext->next = curext;
+			curext->next = tmpext;
 			curext = tmpext;
 			break;
 		case 'r':
