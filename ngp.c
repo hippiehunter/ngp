@@ -62,16 +62,26 @@ typedef struct exclude_list {
 	struct exclude_list	*next;
 } exclude_list_t;
 
+typedef struct s_extension_list {
+	char			ext[256];
+	struct s_extension_list	*next;
+} extension_list_t;
+
+typedef struct s_specific_files {
+	char			spec[256];
+	struct s_specific_files	*next;
+} specific_files_t;
+
 typedef struct s_search_t {
 	/* screen */
-	int index;
-	int cursor;
+	unsigned int index;
+	unsigned int cursor;
 
 	/* data */
 	entry_t *entries;
-	int nbentry;
-	int nb_lines;
-	int size;
+	unsigned int nbentry;
+	unsigned int nb_lines;
+	unsigned int size;
 
 	/* thread */
 	pthread_mutex_t data_mutex;
@@ -81,26 +91,29 @@ typedef struct s_search_t {
 	char directory[PATH_MAX];
 	char pattern[LINE_MAX];
 	char options[LINE_MAX];
-	char file_type[4];
-	char specific_files_list[256][LINE_MAX];
-	int specific_files_number;
-	char extensions_list[64][LINE_MAX];
-	int extensions_number;
-	int raw;
 	int is_regex;
 	regex_t *regex;
-	int follow_symlinks:1;
-	int has_excludes:1;
 
 	/* search in search */
 	struct s_search_t *father;
 	struct s_search_t *child;
 } search_t;
 
-static search_t		mainsearch;
-static search_t		*current;
-static pthread_t	pid;
-struct exclude_list	*firstex = NULL;
+/* attributes specific to mainsearch */
+typedef struct s_mainsearch_attr {
+	unsigned int raw:1;
+	unsigned int follow_symlinks:1;
+	unsigned int has_excludes:1;
+
+	exclude_list_t		*firstexcl;
+	specific_files_t	*firstspec;
+	extension_list_t	*firstext;
+} mainsearch_attr_t;
+
+static search_t			mainsearch;
+static mainsearch_attr_t	mainsearch_attr;
+static search_t			*current;
+static pthread_t		pid;
 
 static void mainsearch_add_file(const char *file);
 static void mainsearch_add_line(const char *line, const char* file);
@@ -122,8 +135,9 @@ static int is_dir_good(char *dir)
 {
 	exclude_list_t *curex;
 
-	if (mainsearch.has_excludes) {
-		curex = firstex;
+	/* check if directory has been excluded */
+	if (mainsearch_attr.has_excludes) {
+		curex = mainsearch_attr.firstexcl;
 		while (curex) {
 			if (!strncmp(curex->path, dir, 256)) {
 				return 0;
@@ -132,6 +146,7 @@ static int is_dir_good(char *dir)
 		}
 	}
 
+	/* check if directory shouldn't be browsed at all */
 	return  strcmp(dir, ".") != 0 &&
 		strcmp(dir, "..") != 0 &&
 		strcmp(dir, ".git") != 0 &&
@@ -140,14 +155,16 @@ static int is_dir_good(char *dir)
 
 static int is_specific_file(const char *name)
 {
-	int i;
-	char *name_begins;
+	int	i;
+	char	*name_begins;
+	specific_files_t *curspec;
 
-	for (i = 0; i < current->specific_files_number; i++) {
+	curspec = mainsearch_attr.firstspec;
+	while (curspec) {
 		name_begins = (strrchr(name, '/') != NULL) ? strrchr(name, '/') + 1 : (char *) name;
-		if (!strcmp(name_begins, current->specific_files_list[i])) {
+		if (!strncmp(name_begins, curspec->spec, 256))
 			return 1;
-		}
+		curspec = curspec->next;
 	}
 	return 0;
 }
@@ -347,9 +364,10 @@ static void lookup_file(const char *file, const char *pattern, char *options)
 	int i;
 	int nb_regex;
 	errno = 0;
-	pthread_mutex_t *mutex;
+	pthread_mutex_t		*mutex;
+	extension_list_t	*curext;
 
-	if (mainsearch.raw) {
+	if (mainsearch_attr.raw) {
 		synchronized(mainsearch.data_mutex)
 			parse_file(file, pattern, options);
 		return;
@@ -361,13 +379,14 @@ static void lookup_file(const char *file, const char *pattern, char *options)
 		return;
 	}
 
-	for (i = 0; i < mainsearch.extensions_number; i++) {
-		if (!strcmp(mainsearch.extensions_list[i],
-			file + strlen(file) - strlen(mainsearch.extensions_list[i]))) {
-			synchronized(mainsearch.data_mutex)
+	curext = mainsearch_attr.firstext;
+	while (curext) {
+		if (!strcmp(curext->ext, file + strlen(file) - strlen(curext->ext))) {
+				synchronized(mainsearch.data_mutex)
 				parse_file(file, pattern, options);
 			break;
 		}
+		curext = curext->next;
 	}
 }
 
@@ -387,10 +406,10 @@ static int is_simlink(char *file_path)
 	return S_ISLNK(filestat.st_mode);
 }
 
-static void lookup_directory(const char *dir, const char *pattern,
-	char *options, char *file_type)
+static void lookup_directory(const char *dir, const char *pattern, char *options)
 {
 	DIR *dp;
+	specific_files_t *curspec;
 
 	dp = opendir(dir);
 	if (!dp) {
@@ -401,30 +420,22 @@ static void lookup_directory(const char *dir, const char *pattern,
 		struct dirent *ep;
 		ep = readdir(dp);
 
-		if (!ep) {
+		if (!ep)
 			break;
-		}
 
 		if (!(ep->d_type & DT_DIR) && is_dir_good(ep->d_name)) {
 			char file_path[PATH_MAX];
 			snprintf(file_path, PATH_MAX, "%s/%s", dir,
 				ep->d_name);
 
-			if (!is_simlink(file_path) || mainsearch.follow_symlinks) {
-				if (file_type != NULL) {
-					if (!strcmp(file_type, ep->d_name + strlen(ep->d_name) - strlen(file_type) ))
-						lookup_file(file_path, pattern, options);
-				} else {
-					lookup_file(file_path, pattern, options);
-				}
-			}
+			if (!is_simlink(file_path) || mainsearch_attr.follow_symlinks)
+				lookup_file(file_path, pattern, options);
 		}
 
 		if (ep->d_type & DT_DIR && is_dir_good(ep->d_name)) {
 			char path_dir[PATH_MAX] = "";
-			snprintf(path_dir, PATH_MAX, "%s/%s", dir,
-				ep->d_name);
-			lookup_directory(path_dir, pattern, options, file_type);
+			snprintf(path_dir, PATH_MAX, "%s/%s", dir, ep->d_name);
+			lookup_directory(path_dir, pattern, options);
 		}
 	}
 	closedir(dp);
@@ -474,9 +485,6 @@ static void mainsearch_add_line(const char *line, const char* file)
 
 static void resize(int *index, int *cursor)
 {
-	/* right now this is a bit trivial,
-	 * but we may do more complex moving around
-	 * when the window is resized */
 	clear();
 	display_entries(index, cursor);
 	refresh();
@@ -615,8 +623,10 @@ void clean_all(void)
 	search_t	*next;
 	exclude_list_t	*curex, *tmpex;
 
+	//FIXME: free LL of specs and exts
+
 	/* free linked list of excludes */
-	curex = firstex;
+	curex = mainsearch_attr.firstexcl;
 	while (curex) {
 		tmpex = curex;
 		curex = curex->next;
@@ -669,7 +679,7 @@ void * lookup_thread(void *arg)
 	if (isfile(d->directory)) {
 		lookup_file(d->directory, d->pattern, d->options);
 	} else {
-		lookup_directory(d->directory, d->pattern, d->options, d->file_type);
+		lookup_directory(d->directory, d->pattern, d->options);
 	}
 
 	d->status = 0;
@@ -683,12 +693,12 @@ void init_searchstruct(search_t *searchstruct)
 	searchstruct->nbentry = 0;
 	searchstruct->nb_lines = 0;
 	searchstruct->status = 1;
-	searchstruct->raw = 0;
+	//searchstruct->raw = 0;
 	searchstruct->is_regex = 0;
 	strcpy(searchstruct->directory, "./");
 	searchstruct->father = NULL;
 	searchstruct->child = NULL;
-	searchstruct->follow_symlinks = 0;
+	//searchstruct->follow_symlinks = 0;
 }
 
 void subsearch_window(char *search)
@@ -824,11 +834,60 @@ int main(int argc, char *argv[])
 	config_t cfg;
 	pthread_mutex_t *mutex;
 	search_t *tmp;
-	struct exclude_list *curex, *tmpex;
+	exclude_list_t		*curex, *tmpex;
+	specific_files_t	*curspec, *tmpspec;
+	extension_list_t	*curext, *tmpext;
 
 	current = &mainsearch;
 	init_searchstruct(&mainsearch);
 	pthread_mutex_init(&mainsearch.data_mutex, NULL);
+
+	/* grab conf */
+	configuration_init(&cfg);
+	if (!config_lookup_string(&cfg, "editor", &editor)) {
+		fprintf(stderr, "ngprc: no editor string found!\n");
+		exit(-1);
+	}
+
+	if (!config_lookup_string(&cfg, "files", &specific_files)) {
+		fprintf(stderr, "ngprc: no files string found!\n");
+		exit(-1);
+	}
+
+	/* get specific files names from configuration */
+	ptr = strtok_r((char *) specific_files, " ", &buf);
+	while (ptr != NULL) {
+		tmpspec = malloc(sizeof(struct s_specific_files));
+		if (!mainsearch_attr.firstspec) {
+			mainsearch_attr.firstspec = tmpspec;
+		} else {
+			curspec->next = tmpspec;
+		}
+		
+		strncpy(tmpspec->spec, ptr, 256);
+		curspec = tmpspec;
+		ptr = strtok_r(NULL, " ", &buf);
+	}
+
+	/* get files extensions from configuration */
+	if (!config_lookup_string(&cfg, "extensions", &extensions)) {
+		fprintf(stderr, "ngprc: no extensions string found!\n");
+		exit(-1);
+	}
+
+	ptr = strtok_r((char *) extensions, " ", &buf);
+	while (ptr != NULL) {
+		tmpext = malloc(sizeof(struct s_extension_list));
+		if (!mainsearch_attr.firstext) {
+			mainsearch_attr.firstext = tmpext;
+		} else {
+			tmpext->next = curext;
+		}
+		
+		strncpy(tmpext->ext, ptr, 256);
+		curext = tmpext;
+		ptr = strtok_r(NULL, " ", &buf);
+	}
 
 	while ((opt = getopt(argc, argv, "hit:refx:")) != -1) {
 		switch (opt) {
@@ -839,23 +898,27 @@ int main(int argc, char *argv[])
 			strcpy(mainsearch.options, "-i");
 			break;
 		case 't':
-			strncpy(mainsearch.file_type, optarg, 3);
+			//FIXME: maybe the LL is empty hehe ...
+			tmpext = malloc(sizeof(extension_list_t));
+			strncpy(tmpext->ext, optarg, 256);
+			tmpext->next = curext;
+			curext = tmpext;
 			break;
 		case 'r':
-			mainsearch.raw = 1;
+			mainsearch_attr.raw = 1;
 			break;
 		case 'e':
 			mainsearch.is_regex = 1;
 			break;
 		case 'f':
-			mainsearch.follow_symlinks = 1;
+			mainsearch_attr.follow_symlinks = 1;
 			break;
 		case 'x':
-			if (!firstex) {
-				firstex = malloc(sizeof(struct exclude_list));
-				strncpy(firstex->path, optarg, 256);
-				curex = firstex;
-				mainsearch.has_excludes = 1;
+			if (!mainsearch_attr.firstexcl) { //FIXME: simplify this shit
+				mainsearch_attr.has_excludes = 1;
+				mainsearch_attr.firstexcl = malloc(sizeof(exclude_list_t));
+				strncpy(mainsearch_attr.firstexcl->path, optarg, 256);
+				curex = mainsearch_attr.firstexcl;
 			} else {
 				tmpex = malloc(sizeof(struct exclude_list));
 				strncpy(tmpex->path, optarg, 256);
@@ -885,41 +948,6 @@ int main(int argc, char *argv[])
 	if (mainsearch.is_regex && !is_regex_valid(&mainsearch)) {
 		fprintf(stderr, "Bad regexp\n");
 		goto quit;
-	}
-
-	configuration_init(&cfg);
-	if (!config_lookup_string(&cfg, "editor", &editor)) {
-		fprintf(stderr, "ngprc: no editor string found!\n");
-		exit(-1);
-	}
-
-	if (!config_lookup_string(&cfg, "files", &specific_files)) {
-		fprintf(stderr, "ngprc: no files string found!\n");
-		exit(-1);
-	}
-
-	mainsearch.specific_files_number = 0;
-	ptr = strtok_r((char *) specific_files, " ", &buf);
-	while (ptr != NULL) {
-		strcpy(mainsearch.specific_files_list[mainsearch.specific_files_number],
-			ptr);
-		mainsearch.specific_files_number++;
-		ptr = strtok_r(NULL, " ", &buf);
-	}
-
-	/* getting files extensions from configuration */
-	if (!config_lookup_string(&cfg, "extensions", &extensions)) {
-		fprintf(stderr, "ngprc: no extensions string found!\n");
-		exit(-1);
-	}
-
-	mainsearch.extensions_number = 0;
-	ptr = strtok_r((char *) extensions, " ", &buf);
-	while (ptr != NULL) {
-		strcpy(mainsearch.extensions_list[mainsearch.extensions_number],
-			ptr);
-		mainsearch.extensions_number++;
-		ptr = strtok_r(NULL, " ", &buf);
 	}
 
 	signal(SIGINT, sig_handler);
