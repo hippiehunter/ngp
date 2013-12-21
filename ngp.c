@@ -468,7 +468,7 @@ static void mainsearch_add_line(const char *line, const char* file)
 	mainsearch.entries[mainsearch.nbentry].isfile = 0;
 	mainsearch.nbentry++;
 	mainsearch.nb_lines++;
-	if (mainsearch.nbentry < current->index + LINES && current == &mainsearch)
+	if (mainsearch.nbentry <= current->index + LINES && current == &mainsearch)
 		display_entries(&mainsearch.index, &mainsearch.cursor);
 }
 
