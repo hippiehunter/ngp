@@ -200,6 +200,7 @@ static void usage()
 	fprintf(stderr, " -r : raw mode\n");
 	fprintf(stderr, " -t type : look for a file extension only\n");
 	fprintf(stderr, " -e : pattern is a regexp\n");
+	fprintf(stderr, " -x : exclude directories\n");
 	exit(-1);
 }
 
