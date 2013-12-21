@@ -193,13 +193,14 @@ static char * remove_double_appearance(char *initial, char c, char *final)
 
 static void usage()
 {
-	fprintf(stderr, "usage: ngp [options]... pattern [directory]\n\n");
+	fprintf(stderr, "usage: ngp [options]... pattern [directory/file]\n\n");
 	fprintf(stderr, "options:\n");
 	fprintf(stderr, " -i : ignore case distinctions in pattern\n");
 	fprintf(stderr, " -r : raw mode\n");
 	fprintf(stderr, " -t type : look for a file extension only\n");
 	fprintf(stderr, " -e : pattern is a regexp\n");
-	fprintf(stderr, " -x : exclude directories\n");
+	fprintf(stderr, " -x folder : exclude directory from search\n");
+	fprintf(stderr, " -f : follow symlinks (default doesn't)\n");
 	exit(-1);
 }
 
@@ -690,12 +691,10 @@ void init_searchstruct(search_t *searchstruct)
 	searchstruct->nbentry = 0;
 	searchstruct->nb_lines = 0;
 	searchstruct->status = 1;
-	//searchstruct->raw = 0;
 	searchstruct->is_regex = 0;
 	strcpy(searchstruct->directory, "./");
 	searchstruct->father = NULL;
 	searchstruct->child = NULL;
-	//searchstruct->follow_symlinks = 0;
 }
 
 void subsearch_window(char *search)
@@ -822,7 +821,7 @@ int main(int argc, char *argv[])
 	config_t cfg;
 	pthread_mutex_t *mutex;
 	search_t *tmp;
-	exclude_list_t		*curex = NULL, *tmpex;
+	exclude_list_t		*curexcl= NULL, *tmpexcl;
 	specific_files_t	*curspec = NULL, *tmpspec;
 	extension_list_t	*curext = NULL, *tmpext;
 
@@ -902,17 +901,18 @@ int main(int argc, char *argv[])
 			mainsearch_attr.follow_symlinks = 1;
 			break;
 		case 'x':
-			if (!mainsearch_attr.firstexcl) { //FIXME: simplify this shit
+			tmpexcl = malloc(sizeof(exclude_list_t));
+			if (!mainsearch_attr.firstexcl) {
 				mainsearch_attr.has_excludes = 1;
-				mainsearch_attr.firstexcl = malloc(sizeof(exclude_list_t));
-				strncpy(mainsearch_attr.firstexcl->path, optarg, 256);
-				curex = mainsearch_attr.firstexcl;
+				mainsearch_attr.firstexcl = tmpexcl;
 			} else {
-				tmpex = malloc(sizeof(struct exclude_list));
-				strncpy(tmpex->path, optarg, 256);
-				curex->next = tmpex;
-				curex = tmpex;
+				curexcl->next = tmpexcl;
 			}
+
+			strncpy(tmpexcl->path, optarg, 256);
+			if (tmpexcl->path[strlen(tmpexcl->path) - 1] == '/')
+				tmpexcl->path[strlen(tmpexcl->path) - 1] = 0;
+			curexcl = tmpexcl;
 			break;
 		default:
 			exit(-1);
