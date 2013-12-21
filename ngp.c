@@ -47,6 +47,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #endif
 #define LINE_MAX	256
 
+#define S_VAR_NOT_USED(x) do{(void)(x);}while(0);
+
 #define synchronized(MUTEX) \
 for(mutex = &MUTEX; \
 mutex && !pthread_mutex_lock(mutex); \
@@ -264,7 +266,7 @@ static void display_entry(int *y, int *index, int color)
 {
 	char filtered_line[PATH_MAX];
 
-	if (*index < current->nbentry) {
+	if ((unsigned) *index < current->nbentry) {
 		if (!is_file(*index)) {
 			if (color == 1) {
 				attron(A_REVERSE);
@@ -308,6 +310,7 @@ char * regex(const char *line, const char *pattern)
 {
 	int ret;
 
+	S_VAR_NOT_USED(pattern);
 	ret = regexec(current->regex, line, 0, NULL, 0);
 
 	if (ret != REG_NOMATCH)
@@ -477,7 +480,8 @@ static void mainsearch_add_line(const char *line)
 	mainsearch.entries[mainsearch.nbentry].isfile = 0;
 	mainsearch.nbentry++;
 	mainsearch.nb_lines++;
-	if (mainsearch.nbentry <= current->index + LINES && current == &mainsearch)
+		if (mainsearch.nbentry <= (unsigned) (current->index + LINES)
+			&& current == &mainsearch)
 		display_entries(&mainsearch.index, &mainsearch.cursor);
 }
 
@@ -561,7 +565,7 @@ static void cursor_down(int *index, int *cursor)
 		return;
 	}
 
-	if (*cursor + *index < current->nbentry - 1) {
+	if (*cursor + *index < (signed) current->nbentry - 1) {
 		*cursor = *cursor + 1;
 	}
 
@@ -681,6 +685,7 @@ void * lookup_thread(void *arg)
 	}
 
 	d->status = 0;
+	return (void *) NULL;
 }
 
 void init_searchstruct(search_t *searchstruct)
@@ -953,7 +958,7 @@ int main(int argc, char *argv[])
 	synchronized(mainsearch.data_mutex)
 		display_entries(&mainsearch.index, &mainsearch.cursor);
 
-	while (ch = getch()) {
+	while ((ch = getch())) {
 		switch(ch) {
 		case KEY_RESIZE:
 			synchronized(mainsearch.data_mutex)
