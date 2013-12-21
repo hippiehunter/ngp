@@ -74,8 +74,8 @@ typedef struct s_specific_files {
 
 typedef struct s_search_t {
 	/* screen */
-	unsigned int index;
-	unsigned int cursor;
+	int index;
+	int cursor;
 
 	/* data */
 	entry_t *entries;
@@ -85,13 +85,13 @@ typedef struct s_search_t {
 
 	/* thread */
 	pthread_mutex_t data_mutex;
-	int status;
+	unsigned int status:1;
 
 	/* search */
 	char directory[PATH_MAX];
 	char pattern[LINE_MAX];
 	char options[LINE_MAX];
-	int is_regex;
+	unsigned int is_regex:1;
 	regex_t *regex;
 
 	/* search in search */
@@ -116,7 +116,7 @@ static search_t			*current;
 static pthread_t		pid;
 
 static void mainsearch_add_file(const char *file);
-static void mainsearch_add_line(const char *line, const char* file);
+static void mainsearch_add_line(const char *line);
 
 static int is_file(int index)
 {
@@ -155,8 +155,7 @@ static int is_dir_good(char *dir)
 
 static int is_specific_file(const char *name)
 {
-	int	i;
-	char	*name_begins;
+	char *name_begins;
 	specific_files_t *curspec;
 
 	curspec = mainsearch_attr.firstspec;
@@ -234,9 +233,8 @@ static void check_alloc(search_t *toinc, int size)
 	}
 }
 
-static void printl(int *y, char *line)
+static void printl(int *y, const char *line)
 {
-	int size;
 	int crop = COLS;
 	char cropped_line[PATH_MAX];
 	char filtered_line[PATH_MAX];
@@ -261,7 +259,7 @@ static void printl(int *y, char *line)
 	}
 }
 
-static int display_entry(int *y, int *index, int color)
+static void display_entry(int *y, int *index, int color)
 {
 	char filtered_line[PATH_MAX];
 
@@ -292,7 +290,6 @@ static int display_entry(int *y, int *index, int color)
 static int is_regex_valid(search_t *cursearch)
 {
 	regex_t	*reg;
-	int	ret;
 
 	reg = malloc(sizeof(regex_t));
 	if (regcomp(reg, cursearch->pattern, 0)) {
@@ -302,13 +299,15 @@ static int is_regex_valid(search_t *cursearch)
 		mainsearch.regex = reg;
 		return 1;
 	}
+
+	return 1;
 }
 
 char * regex(const char *line, const char *pattern)
 {
-	int	ret;
+	int ret;
 
-	ret = regexec(mainsearch.regex, line, 0, NULL, 0);
+	ret = regexec(current->regex, line, 0, NULL, 0);
 
 	if (ret != REG_NOMATCH)
 		return "1";
@@ -352,7 +351,7 @@ static int parse_file(const char *file, const char *pattern, char *options)
 			if (line[strlen(line) - 2] == '\r')
 				line[strlen(line) - 2] = '\0';
 			snprintf(full_line, LINE_MAX, "%d:%s", line_number, line);
-			mainsearch_add_line(full_line, file);
+			mainsearch_add_line(full_line);
 		}
 		line_number++;
 	}
@@ -362,8 +361,6 @@ static int parse_file(const char *file, const char *pattern, char *options)
 
 static void lookup_file(const char *file, const char *pattern, char *options)
 {
-	int i;
-	int nb_regex;
 	errno = 0;
 	pthread_mutex_t		*mutex;
 	extension_list_t	*curext;
@@ -410,7 +407,6 @@ static int is_simlink(char *file_path)
 static void lookup_directory(const char *dir, const char *pattern, char *options)
 {
 	DIR *dp;
-	specific_files_t *curspec;
 
 	dp = opendir(dir);
 	if (!dp) {
@@ -469,7 +465,7 @@ static void mainsearch_add_file(const char *file)
 	mainsearch.nbentry++;
 }
 
-static void mainsearch_add_line(const char *line, const char* file)
+static void mainsearch_add_line(const char *line)
 {
 	char	*new_line;
 
@@ -610,9 +606,9 @@ static void open_entry(int index, const char *editor, const char *pattern)
 
 void clean_search(search_t *search)
 {
-	int i;
+	unsigned int i;
 
-	for (i=0; i<search->nbentry; i++) {
+	for (i = 0; i < search->nbentry; i++) {
 		free(search->entries[i].data);
 	}
 	free(search->entries);
@@ -639,7 +635,7 @@ void clean_all(void)
 		next = current->father;
 		clean_search(current);
 		current = next;
-	} while(next != NULL);
+	} while (next != NULL);
 }
 
 static void sig_handler(int signo)
@@ -736,7 +732,6 @@ void subsearch_window(char *search)
 search_t * subsearch(search_t *father)
 {
 	search_t	*child;
-	entry_t		*tmp_file;
 	unsigned int	i;
 	char		*search;
 	bool		orphan_file = 0;
@@ -764,30 +759,24 @@ search_t * subsearch(search_t *father)
 	if (!is_regex_valid(child))
 		return NULL;
 
-	for (i=0; i < father->nbentry; i++) {
+	for (i = 0; i < father->nbentry; i++) {
 		if (is_file(i)) {
 			/* previous file had no entries, free it */
-			if (orphan_file) {
-				free(tmp_file->data);
-				free(tmp_file);
-			}
+			if (orphan_file)
+				free(new_data);
 
-			/* create a tmp_file entry but don't add it yet */
-			tmp_file = malloc(sizeof(entry_t));
+			/* prepare entry.data but don't add it yet */
 			new_data = malloc(LINE_MAX * sizeof(char));
-			strncpy(new_data, strchr(father->entries[i].data, '/') + 2, LINE_MAX);
-			tmp_file->data = new_data;
-			tmp_file->isfile = 1;
+			strncpy(new_data, father->entries[i].data, LINE_MAX);
 			orphan_file = 1;
 		} else if (regex(father->entries[i].data, child->pattern)) {
 			check_alloc(child, 100);
 			/* file has entries, add it */
 			if (orphan_file) {
-				child->entries[child->nbentry].data = tmp_file->data;
-				child->entries[child->nbentry].isfile = 0;
+				child->entries[child->nbentry].data = new_data;
+				child->entries[child->nbentry].isfile = 1;
 				child->nbentry++;
 				orphan_file = 0;
-				free(tmp_file);
 			}
 			/* now add line */
 			new_data = malloc(LINE_MAX * sizeof(char));
@@ -822,9 +811,7 @@ void display_status(void)
 
 int main(int argc, char *argv[])
 {
-	DIR *dp;
 	int opt;
-	struct dirent *ep;
 	int ch;
 	int first = 0;
 	const char *editor;
@@ -835,9 +822,9 @@ int main(int argc, char *argv[])
 	config_t cfg;
 	pthread_mutex_t *mutex;
 	search_t *tmp;
-	exclude_list_t		*curex, *tmpex;
-	specific_files_t	*curspec, *tmpspec;
-	extension_list_t	*curext, *tmpext;
+	exclude_list_t		*curex = NULL, *tmpex;
+	specific_files_t	*curspec = NULL, *tmpspec;
+	extension_list_t	*curext = NULL, *tmpext;
 
 	current = &mainsearch;
 	init_searchstruct(&mainsearch);
@@ -1038,5 +1025,6 @@ int main(int argc, char *argv[])
 quit:
 	ncurses_stop();
 	clean_all();
+	return 0;
 }
 
