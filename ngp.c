@@ -867,7 +867,11 @@ search_t * subsearch(search_t *father)
 			strncpy(new_data, father->entries[i].data, LINE_MAX);
 			orphan_file = 1;
 		} else if (regex(father->entries[i].data, child->pattern)) {
-			check_alloc(child, 100);
+			//check_alloc(child, 100); //FIXME this should work ...
+			if (child->nbentry%100 >= 98) {
+				child->size += 100;
+				child->entries = realloc(child->entries, child->size * sizeof(entry_t));
+			}
 			/* file has entries, add it */
 			if (orphan_file) {
 				child->entries[child->nbentry].data = new_data;
