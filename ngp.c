@@ -35,12 +35,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include <ctype.h>
 #include <regex.h>
 
-#define CURSOR_UP 	'k'
-#define CURSOR_DOWN 	'j'
+#define CURSOR_UP	'k'
+#define CURSOR_DOWN	'j'
 #define PAGE_UP		'K'
 #define PAGE_DOWN	'J'
-#define ENTER	 	'p'
-#define QUIT	 	'q'
+#define ENTER		'p'
+#define QUIT		'q'
 
 #ifdef LINE_MAX
 	#undef LINE_MAX
@@ -173,7 +173,7 @@ static void ncurses_init()
 	curs_set(0);
 }
 
-void get_config(const char *editor, extension_list_t **curext,
+const char * get_config(const char *editor, extension_list_t **curext,
 		specific_files_t **curspec)
 {
 	char *ptr;
@@ -230,6 +230,8 @@ void get_config(const char *editor, extension_list_t **curext,
 		*curext = tmpext;
 		ptr = strtok_r(NULL, " ", &buf);
 	}
+
+	return editor;
 }
 
 void get_args(int argc, char *argv[], extension_list_t **curext, exclude_list_t **curexcl)
@@ -968,7 +970,7 @@ int main(int argc, char *argv[])
 	current = &mainsearch;
 	init_searchstruct(&mainsearch);
 	pthread_mutex_init(&mainsearch.data_mutex, NULL);
-	get_config(editor, &curext, &curspec);
+	editor = get_config(editor, &curext, &curspec);
 	get_args(argc, argv, &curext, &curexcl);
 
 	if (argc - optind < 1 || argc - optind > 2) {
