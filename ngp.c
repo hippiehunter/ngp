@@ -704,7 +704,11 @@ static int parse_file(const char *file, const char *pattern, char *options)
 			snprintf(full_line, LINE_MAX, "%d:%s", line_number, line);
 			mainsearch_add_line(full_line);
 		}
-		line_number++;
+		/* check line has a \n */
+		//FIXME this is ugly
+		if (line[strlen(line) - 1] == '\n')
+			line_number++;
+		memset(line, 0, LINE_MAX);
 	}
 	fclose(f);
 	return 0;
