@@ -784,7 +784,7 @@ void * lookup_thread(void *arg)
 	search_t *d = (search_t *) arg;
 
 	if (isfile(d->directory)) {
-		lookup_file(d->directory, d->pattern, d->options);
+		parse_file(d->directory, d->pattern, d->options);
 	} else {
 		lookup_directory(d->directory, d->pattern, d->options);
 	}
