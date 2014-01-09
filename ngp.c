@@ -461,14 +461,7 @@ static void display_entry(int *y, int *index, int color)
 			}
 		} else {
 			attron(A_BOLD);
-			if (strcmp(current->directory, "./") == 0)
-				printl(y, remove_double_appearance(
-					current->entries[*index].data + 3, '/',
-					filtered_line));
-			else
-				printl(y, remove_double_appearance(
-					current->entries[*index].data, '/',
-					filtered_line));
+			printl(y, remove_double_appearance(current->entries[*index].data, '/', filtered_line));
 			attroff(A_BOLD);
 		}
 	}
