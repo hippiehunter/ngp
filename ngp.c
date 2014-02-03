@@ -402,6 +402,32 @@ int find_file(int index)
 	return index;
 }
 
+/* escape '/' and ''' characters for vim search command */
+static char * vim_sanitize(const char *search_pattern)
+{
+	int	i = 0, j = 0;
+	char	*sanitized_pattern;
+	size_t	size;
+
+	size = strlen(search_pattern) + 1;
+	sanitized_pattern = (char *) malloc(size);
+
+	while (search_pattern[i]) {
+		if (search_pattern[i] == '/' || search_pattern[i] == '\'') {
+			size++;
+			sanitized_pattern = realloc(sanitized_pattern, size);
+			sanitized_pattern[j] = '\\';
+			j++;
+		}
+		sanitized_pattern[j] = search_pattern[i];
+		i++;
+		j++;
+	}
+	sanitized_pattern[j] = 0;
+
+	return sanitized_pattern;
+}
+
 static void open_entry(int index, const char *editor, const char *pattern)
 {
 	char command[PATH_MAX];
@@ -409,6 +435,9 @@ static void open_entry(int index, const char *editor, const char *pattern)
 	char line_copy[PATH_MAX];
 	int file_index;
 	pthread_mutex_t *mutex;
+	char *sanitized_pattern;
+
+	sanitized_pattern = vim_sanitize(pattern);
 
 	file_index = find_file(index);
 	synchronized(mainsearch.data_mutex) {
@@ -418,9 +447,10 @@ static void open_entry(int index, const char *editor, const char *pattern)
 			remove_double_appearance(
 				current->entries[file_index].data, '/',
 				filtered_file_name),
-			pattern);
+			sanitized_pattern);
 	}
 	system(command);
+	free(sanitized_pattern);
 }
 
 
