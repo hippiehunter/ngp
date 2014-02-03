@@ -292,9 +292,9 @@ void get_args(int argc, char *argv[], extension_list_t **curext, exclude_list_t 
 
 
 /*************************** UTILS ********************************************/
-static int is_file(int index)
+static int is_file(int index, search_t *cursearch)
 {
-	return current->entries[index].isfile;
+	return cursearch->entries[index].isfile;
 }
 
 static int isfile(char *nodename)
@@ -396,7 +396,7 @@ static void usage(void)
 
 int find_file(int index)
 {
-	while (!is_file(index))
+	while (!is_file(index, current))
 		index--;
 
 	return index;
@@ -456,7 +456,7 @@ static void display_entry(int *y, int *index, int color)
 	char filtered_line[PATH_MAX];
 
 	if ((unsigned) *index < current->nbentry) {
-		if (!is_file(*index)) {
+		if (!is_file(*index, current)) {
 			if (color == 1) {
 				attron(A_REVERSE);
 				printl(y, current->entries[*index].data);
@@ -505,7 +505,7 @@ static void page_up(int *index, int *cursor)
 	*index -= LINES;
 	*index = (*index < 0 ? 0 : *index);
 
-	if (is_file(*index + *cursor) && *index != 0)
+	if (is_file(*index + *cursor, current) && *index != 0)
 		*cursor -= 1;
 
 	display_entries(index, cursor);
@@ -533,7 +533,7 @@ static void page_down(int *index, int *cursor)
 	*index += LINES;
 	*index = (*index > max_index ? max_index : *index);
 
-	if (is_file(*index + *cursor))
+	if (is_file(*index + *cursor, current))
 		*cursor += 1;
 	display_entries(index, cursor);
 }
@@ -549,7 +549,7 @@ static void cursor_up(int *index, int *cursor)
 		*cursor = *cursor - 1;
 	}
 
-	if (is_file(*index + *cursor))
+	if (is_file(*index + *cursor, current))
 		*cursor = *cursor - 1;
 
 	if (*cursor < 0) {
@@ -571,7 +571,7 @@ static void cursor_down(int *index, int *cursor)
 		*cursor = *cursor + 1;
 	}
 
-	if (is_file(*index + *cursor))
+	if (is_file(*index + *cursor, current))
 		*cursor = *cursor + 1;
 
 	if (*cursor > (LINES - 1)) {
@@ -637,17 +637,18 @@ static void mainsearch_add_line(const char *line)
 
 
 /*************************** PARSING ******************************************/
+//FIXME: malloc not free'd
 static int is_regex_valid(search_t *cursearch)
 {
 	regex_t	*reg;
 
-	reg = malloc(sizeof(regex_t));
+	reg = malloc(sizeof(regex_t)); //FIXME: not freed
 	if (regcomp(reg, cursearch->pattern, 0)) {
 		free(reg);
 		return 0;
 	} else {
-		mainsearch.regex = reg;
-		return 1;
+		cursearch->regex = reg;
+		//mainsearch.regex = reg;
 	}
 
 	return 1;
@@ -833,7 +834,7 @@ search_t * subsearch(search_t *father)
 	char		*new_data;
 
 	search = malloc(LINE_MAX * sizeof(char));
-	memset(search, '\0', LINE_MAX);
+	memset(search, 0, LINE_MAX);
 	subsearch_window(search);
 
 	/*Verify search is not empty*/
@@ -853,9 +854,10 @@ search_t * subsearch(search_t *father)
 
 	if (!is_regex_valid(child))
 		return NULL;
+	current = child;
 
 	for (i = 0; i < father->nbentry; i++) {
-		if (is_file(i)) {
+		if (is_file(i, father)) {
 			/* previous file had no entries, free it */
 			if (orphan_file)
 				free(new_data);
@@ -920,6 +922,7 @@ void clean_all(void)
 		curex = curex->next;
 		free(tmpex);
 	}
+
 	curext = mainsearch_attr.firstext;
 	while (curext) {
 		tmpext = curext;
