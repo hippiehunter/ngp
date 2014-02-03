@@ -305,26 +305,41 @@ static int isfile(char *nodename)
 	return !S_ISDIR(buf.st_mode);
 }
 
-static int is_dir_good(char *dir)
+static int is_dir_exclude(char *dir)
 {
 	exclude_list_t *curex;
+
+	//FIXME: yuk .... :(
+	if (dir[0] == '.')
+		dir++;
+	if (dir[0] == '/')
+		dir++;
+	if (dir[0] == '/')
+		dir++;
 
 	/* check if directory has been excluded */
 	if (mainsearch_attr.has_excludes) {
 		curex = mainsearch_attr.firstexcl;
 		while (curex) {
+		FILE *ngplog = fopen("/tmp/logngp", "a+");
+		fprintf(ngplog, "%s and %s\n", curex->path, dir);
+		fclose(ngplog);
 			if (!strncmp(curex->path, dir, LINE_MAX)) {
-				return 0;
+				return 1;
 			}
 			curex = curex->next;
 		}
 	}
 
+	return 0;
+}
+
+static int is_dir_special (const char *dir) {
 	/* check if directory shouldn't be browsed at all */
-	return  strcmp(dir, ".") != 0 &&
-		strcmp(dir, "..") != 0 &&
-		strcmp(dir, ".git") != 0 &&
-		strcmp(dir, ".svn") != 0 ? 1 : 0;
+	return  !(strcmp(dir, ".") &&
+		strcmp(dir, "..") &&
+		strcmp(dir, ".git") &&
+		strcmp(dir, ".svn"));
 }
 
 static int is_simlink(char *file_path)
@@ -790,7 +805,8 @@ static void lookup_directory(const char *dir, const char *pattern, char *options
 		if (!ep)
 			break;
 
-		if (!(ep->d_type & DT_DIR) && is_dir_good(ep->d_name)) {
+		/* file */
+		if (!(ep->d_type & DT_DIR)) {
 			char file_path[PATH_MAX];
 			snprintf(file_path, PATH_MAX, "%s/%s", dir,
 				ep->d_name);
@@ -799,10 +815,12 @@ static void lookup_directory(const char *dir, const char *pattern, char *options
 				lookup_file(file_path, pattern, options);
 		}
 
-		if (ep->d_type & DT_DIR && is_dir_good(ep->d_name)) {
+		/* directory */
+		if (ep->d_type&DT_DIR && !is_dir_special(ep->d_name)) {
 			char path_dir[PATH_MAX] = "";
 			snprintf(path_dir, PATH_MAX, "%s/%s", dir, ep->d_name);
-			lookup_directory(path_dir, pattern, options);
+			if (!is_dir_exclude(path_dir))
+				lookup_directory(path_dir, pattern, options);
 		}
 	}
 	closedir(dp);
