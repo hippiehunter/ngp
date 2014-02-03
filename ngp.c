@@ -207,6 +207,7 @@ const char * get_config(const char *editor, extension_list_t **curext,
 		}
 
 		strncpy(tmpspec->spec, ptr, LINE_MAX);
+		tmpspec->next = NULL;
 		*curspec = tmpspec;
 		ptr = strtok_r(NULL, " ", &buf);
 	}
@@ -219,7 +220,7 @@ const char * get_config(const char *editor, extension_list_t **curext,
 
 	ptr = strtok_r((char *) extensions, " ", &buf);
 	while (ptr != NULL) {
-		tmpext = malloc(sizeof(struct s_extension_list));
+		tmpext = malloc(sizeof(extension_list_t));
 		if (!mainsearch_attr.firstext) {
 			mainsearch_attr.firstext = tmpext;
 		} else {
@@ -227,6 +228,7 @@ const char * get_config(const char *editor, extension_list_t **curext,
 		}
 
 		strncpy(tmpext->ext, ptr, LINE_MAX);
+		tmpext->next = NULL;
 		*curext = tmpext;
 		ptr = strtok_r(NULL, " ", &buf);
 	}
@@ -252,6 +254,7 @@ void get_args(int argc, char *argv[], extension_list_t **curext, exclude_list_t 
 			//FIXME: maybe the LL is empty hehe ...
 			tmpext = malloc(sizeof(extension_list_t));
 			strncpy(tmpext->ext, optarg, LINE_MAX);
+			tmpext->next = NULL;
 			(*curext)->next = tmpext;
 			*curext = tmpext;
 			break;
@@ -274,6 +277,8 @@ void get_args(int argc, char *argv[], extension_list_t **curext, exclude_list_t 
 			}
 
 			strncpy(tmpexcl->path, optarg, LINE_MAX);
+			tmpexcl->next = NULL;
+			/* remove trailing '/' of folder */
 			if (tmpexcl->path[strlen(tmpexcl->path) - 1] == '/')
 				tmpexcl->path[strlen(tmpexcl->path) - 1] = 0;
 			*curexcl = tmpexcl;
@@ -915,7 +920,6 @@ void clean_all(void)
 		curex = curex->next;
 		free(tmpex);
 	}
-
 	curext = mainsearch_attr.firstext;
 	while (curext) {
 		tmpext = curext;
@@ -930,12 +934,19 @@ void clean_all(void)
 		free(tmpspec);
 	}
 
-	/* free all search structs */
-	do {
+	next = current->father;
+	while (next) {
 		next = current->father;
 		clean_search(current);
 		current = next;
-	} while (next != NULL);
+	}
+	/* free all search structs */
+	/*do {
+		LOG("in2\n");
+		next = current->father;
+		clean_search(current);
+		current = next;
+	} while (next != NULL);*/
 }
 
 static void ncurses_stop()
@@ -945,7 +956,10 @@ static void ncurses_stop()
 
 static void sig_handler(int signo)
 {
+	int *ptr;
+
 	if (signo == SIGINT) {
+		pthread_kill(pid, (void *) ptr);
 		ncurses_stop();
 		clean_all();
 		exit(-1);
