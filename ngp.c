@@ -60,7 +60,7 @@ typedef struct s_entry_t {
 } entry_t;
 
 typedef struct s_exclude_list {
-	char			path[LINE_MAX];
+	ino_t			d_ino;
 	struct s_exclude_list	*next;
 } exclude_list_t;
 
@@ -119,6 +119,7 @@ static pthread_t		pid;
 
 static void usage(void);
 
+
 /*************************** INIT *********************************************/
 static void configuration_init(config_t *cfg)
 {
@@ -142,7 +143,7 @@ static void configuration_init(config_t *cfg)
 	}
 }
 
-void init_searchstruct(search_t *searchstruct)
+static void init_searchstruct(search_t *searchstruct)
 {
 	searchstruct->index = 0;
 	searchstruct->cursor = 0;
@@ -173,7 +174,7 @@ static void ncurses_init()
 	curs_set(0);
 }
 
-const char * get_config(const char *editor, extension_list_t **curext,
+static const char * get_config(const char *editor, extension_list_t **curext,
 		specific_files_t **curspec)
 {
 	char *ptr;
@@ -236,7 +237,19 @@ const char * get_config(const char *editor, extension_list_t **curext,
 	return editor;
 }
 
-void get_args(int argc, char *argv[], extension_list_t **curext, exclude_list_t **curexcl)
+//FIXME: move to utils
+static ino_t get_inode_from_path(const char *path)
+{
+	struct stat buf;
+
+	if (stat(path, &buf) != 0) {
+		return 0;
+	}
+
+	return buf.st_ino;
+}
+
+static void get_args(int argc, char *argv[], extension_list_t **curext, exclude_list_t **curexcl)
 {
 	int opt;
 	exclude_list_t		*tmpexcl;
@@ -276,11 +289,8 @@ void get_args(int argc, char *argv[], extension_list_t **curext, exclude_list_t 
 				(*curexcl)->next = tmpexcl;
 			}
 
-			strncpy(tmpexcl->path, optarg, LINE_MAX);
+			tmpexcl->d_ino = get_inode_from_path(optarg);
 			tmpexcl->next = NULL;
-			/* remove trailing '/' of folder */
-			if (tmpexcl->path[strlen(tmpexcl->path) - 1] == '/')
-				tmpexcl->path[strlen(tmpexcl->path) - 1] = 0;
 			*curexcl = tmpexcl;
 			break;
 		default:
@@ -305,26 +315,15 @@ static int isfile(char *nodename)
 	return !S_ISDIR(buf.st_mode);
 }
 
-static int is_dir_exclude(char *dir)
+static int is_dir_exclude(const ino_t d_ino)
 {
 	exclude_list_t *curex;
-
-	//FIXME: yuk .... :(
-	if (dir[0] == '.')
-		dir++;
-	if (dir[0] == '/')
-		dir++;
-	if (dir[0] == '/')
-		dir++;
 
 	/* check if directory has been excluded */
 	if (mainsearch_attr.has_excludes) {
 		curex = mainsearch_attr.firstexcl;
 		while (curex) {
-		FILE *ngplog = fopen("/tmp/logngp", "a+");
-		fprintf(ngplog, "%s and %s\n", curex->path, dir);
-		fclose(ngplog);
-			if (!strncmp(curex->path, dir, LINE_MAX)) {
+			if (d_ino == curex->d_ino) {
 				return 1;
 			}
 			curex = curex->next;
@@ -409,7 +408,7 @@ static void usage(void)
 	exit(-1);
 }
 
-int find_file(int index)
+static int find_file(int index)
 {
 	while (!is_file(index, current))
 		index--;
@@ -627,7 +626,7 @@ static void cursor_down(int *index, int *cursor)
 	display_entries(index, cursor);
 }
 
-void display_status(void)
+static void display_status(void)
 {
 	char *rollingwheel[4] = {"/", "-", "\\", "|"};
 	static int i = 0;
@@ -697,7 +696,7 @@ static int is_regex_valid(search_t *cursearch)
 	return 1;
 }
 
-char * regex(const char *line, const char *pattern)
+static char * regex(const char *line, const char *pattern)
 {
 	int ret;
 
@@ -815,16 +814,17 @@ static void lookup_directory(const char *dir, const char *pattern, char *options
 
 		/* directory */
 		if (ep->d_type&DT_DIR && !is_dir_special(ep->d_name)) {
-			char path_dir[PATH_MAX] = "";
-			snprintf(path_dir, PATH_MAX, "%s/%s", dir, ep->d_name);
-			if (!is_dir_exclude(path_dir))
+			if (!is_dir_exclude(ep->d_ino)) {
+				char path_dir[PATH_MAX] = "";
+				snprintf(path_dir, PATH_MAX, "%s/%s", dir, ep->d_name);
 				lookup_directory(path_dir, pattern, options);
+			}
 		}
 	}
 	closedir(dp);
 }
 
-void * lookup_thread(void *arg)
+static void * lookup_thread(void *arg)
 {
 	search_t *d = (search_t *) arg;
 
@@ -840,7 +840,7 @@ void * lookup_thread(void *arg)
 
 
 /*************************** SUBSEARCH ****************************************/
-void subsearch_window(char *search)
+static void subsearch_window(char *search)
 {
 	WINDOW	*searchw;
 	int	j = 0, car;
@@ -871,7 +871,7 @@ void subsearch_window(char *search)
 	delwin(searchw);
 }
 
-search_t * subsearch(search_t *father)
+static search_t * subsearch(search_t *father)
 {
 	search_t	*child;
 	unsigned int	i;
@@ -943,7 +943,7 @@ search_t * subsearch(search_t *father)
 
 
 /*************************** CLEANUP ******************************************/
-void clean_search(search_t *search)
+static void clean_search(search_t *search)
 {
 	unsigned int i;
 
@@ -955,7 +955,7 @@ void clean_search(search_t *search)
 //	free(search); //wont work cuz mainsearch ain't no pointer yo
 }
 
-void clean_all(void)
+static void clean_all(void)
 {
 	search_t	*next;
 	exclude_list_t	*curex, *tmpex;
@@ -990,13 +990,6 @@ void clean_all(void)
 		clean_search(current);
 		current = next;
 	}
-	/* free all search structs */
-	/*do {
-		LOG("in2\n");
-		next = current->father;
-		clean_search(current);
-		current = next;
-	} while (next != NULL);*/
 }
 
 static void ncurses_stop()
