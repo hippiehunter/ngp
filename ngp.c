@@ -682,18 +682,16 @@ static void mainsearch_add_line(const char *line)
 
 
 /*************************** PARSING ******************************************/
-//FIXME: malloc not free'd
 static int is_regex_valid(search_t *cursearch)
 {
 	regex_t	*reg;
 
-	reg = malloc(sizeof(regex_t)); //FIXME: not freed
+	reg = malloc(sizeof(regex_t));
 	if (regcomp(reg, cursearch->pattern, 0)) {
 		free(reg);
 		return 0;
 	} else {
 		cursearch->regex = reg;
-		//mainsearch.regex = reg;
 	}
 
 	return 1;
@@ -953,6 +951,7 @@ void clean_search(search_t *search)
 		free(search->entries[i].data);
 	}
 	free(search->entries);
+	free(search->regex);
 //	free(search); //wont work cuz mainsearch ain't no pointer yo
 }
 
