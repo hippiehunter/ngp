@@ -1006,10 +1006,8 @@ static void ncurses_stop()
 
 static void sig_handler(int signo)
 {
-	int *ptr;
-
 	if (signo == SIGINT) {
-		pthread_kill(pid, (void *) ptr);
+		pthread_kill(pid, SIGINT);
 		ncurses_stop();
 		clean_all();
 		exit(-1);
