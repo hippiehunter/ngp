@@ -12,9 +12,11 @@ ngp lets you open a result with your favorite editor at the right line.
 Installation
 ------------
 
-- ./configure
+- mkdir build
+- cd build
+- cmake ../
 - make
-- make install
+- sudo make install
 - enjoy !
 
 Looking for "boot_param" pattern in kernel
